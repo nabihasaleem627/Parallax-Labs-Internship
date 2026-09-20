@@ -1,0 +1,103 @@
+// @ts-check
+/**
+ * Prisma schema for the multi-tenant booking platform.
+ *
+ * Tenancy model:
+ *  - Every organization is a `Tenant` (identified by a unique subdomain).
+ *  - `User` and `Booking` rows always carry a `tenantId`.
+ *  - Isolation is enforced in the database with Row-Level Security policies
+ *    (see prisma/migrations) — the application never trusts client input to
+ *    decide which tenant's data is visible.
+ *
+ * `email` on User is globally unique: one account belongs to one
+ * organization (standard B2B SaaS model; cross-tenant invites are a
+ * later-week feature).
+ */
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ORG_ADMIN
+  STAFF
+  USER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  subdomain String   @unique
+  // Reserved for Stripe integration (subscription tier), Week 2+.
+  plan      String   @default("free")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users    User[]
+  bookings Booking[]
+
+  @@map("Tenant")
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @db.Uuid
+  email        String     @unique
+  name         String
+  passwordHash String
+  role         UserRole   @default(USER)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings          Booking[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([tenantId])
+  @@map("User")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("PasswordResetToken")
+}
+
+model Booking {
+  id        String        @id @default(uuid()) @db.Uuid
+  tenantId  String        @db.Uuid
+  userId    String        @db.Uuid
+  title     String
+  notes     String?
+  startsAt  DateTime
+  endsAt    DateTime
+  status    BookingStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, startsAt])
+  @@index([tenantId, status])
+  @@map("Booking")
+}
