@@ -1,0 +1,153 @@
+// Prisma schema for Modern Multi-Tenant SaaS Booking Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+  VIEWER
+}
+
+model Tenant {
+  id                 String           @id @default(cuid())
+  slug               String           @unique
+  name               String
+  industry           String           @default("General")
+  email              String
+  phone              String?
+  timezone           String           @default("UTC")
+  currency           String           @default("USD")
+  businessHoursStart String           @default("09:00")
+  businessHoursEnd   String           @default("18:00")
+  workingDays        String           @default("1,2,3,4,5")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  users              User[]
+  customers          Customer[]
+  services           Service[]
+  bookings           Booking[]
+  idempotencyRecords IdempotencyKey[]
+
+  @@index([slug])
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  role         UserRole  @default(ADMIN)
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  bookingsCreated Booking[]
+
+  @@index([tenantId])
+}
+
+model Customer {
+  id        String    @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  notes     String?
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  bookings  Booking[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+model Service {
+  id              String    @id @default(cuid())
+  name            String
+  durationMinutes Int       @default(60)
+  price           Float     @default(0)
+  color           String    @default("#3b82f6")
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  bookings        Booking[]
+
+  @@index([tenantId])
+}
+
+model Booking {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  customerId     String?
+  customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  
+  customerName   String
+  customerEmail  String
+  customerPhone  String?
+  
+  serviceId      String?
+  service        Service?      @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  serviceName    String        @default("General Appointment")
+  
+  bookingDate    DateTime
+  startTime      String        // e.g. "09:00"
+  endTime        String        // e.g. "10:00"
+  
+  startDateTime  DateTime      // Normalized UTC timestamp for interval queries
+  endDateTime    DateTime      // Normalized UTC timestamp for interval queries
+  
+  status         BookingStatus @default(CONFIRMED)
+  notes          String?
+  price          Float         @default(0)
+  
+  idempotencyKey String?       @unique
+  
+  createdById    String?
+  createdBy      User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([tenantId, bookingDate])
+  @@index([tenantId, status])
+  @@index([tenantId, startDateTime, endDateTime])
+}
+
+model IdempotencyKey {
+  id             String    @id @default(cuid())
+  key            String
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  requestPath    String
+  requestParams  String?
+  responseStatus Int
+  responseBody   String    @db.Text
+  
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime
+
+  @@unique([tenantId, key])
+  @@index([expiresAt])
+}

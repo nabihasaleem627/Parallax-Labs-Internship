@@ -1,0 +1,297 @@
+{
+  "info": {
+    "_postman_id": "c1f73b64-89c2-47d1-a48f-saas-booking-api",
+    "name": "SaaS Booking Platform REST API",
+    "description": "Production Postman collection documenting all endpoints for the Modern Multi-Tenant SaaS Booking Platform. Covers booking CRUD operations, Idempotency-Key protection, atomic conflict prevention, and tenant scoping.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "tenantSlug",
+      "value": "acme-wellness",
+      "type": "string"
+    },
+    {
+      "key": "bookingId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health"]
+        },
+        "description": "Verify system health and active PostgreSQL database connection status."
+      },
+      "response": [
+        {
+          "name": "Healthy Response",
+          "originalRequest": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"status\": \"healthy\",\n  \"timestamp\": \"2026-09-27T08:00:00.000Z\",\n  \"service\": \"SaaS Booking Platform API\",\n  \"version\": \"1.0.0\",\n  \"database\": \"connected\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Create Booking (with Idempotency-Key)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+            "description": "Unique UUID v4 to guarantee request idempotency across retries"
+          },
+          {
+            "key": "x-tenant-slug",
+            "value": "{{tenantSlug}}",
+            "description": "Tenant organization slug for multi-tenant isolation"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerName\": \"Eleanor Vance\",\n  \"customerEmail\": \"eleanor.vance@example.com\",\n  \"customerPhone\": \"+1 (555) 987-6543\",\n  \"serviceName\": \"Initial Health Consultation\",\n  \"bookingDate\": \"2026-10-15\",\n  \"startTime\": \"09:00\",\n  \"endTime\": \"10:00\",\n  \"status\": \"CONFIRMED\",\n  \"notes\": \"Follow-up consult regarding initial scan results.\",\n  \"price\": 150\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "bookings"]
+        },
+        "description": "Creates a new booking slot. Evaluates conflict intervals and stores response in idempotency cache."
+      },
+      "response": [
+        {
+          "name": "201 Created (Success)",
+          "status": "Created",
+          "code": 201,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"cm1q2w3e4r5t6y7u8\",\n    \"tenantId\": \"cuid_acme_wellness\",\n    \"customerName\": \"Eleanor Vance\",\n    \"customerEmail\": \"eleanor.vance@example.com\",\n    \"customerPhone\": \"+1 (555) 987-6543\",\n    \"serviceName\": \"Initial Health Consultation\",\n    \"bookingDate\": \"2026-10-15T00:00:00.000Z\",\n    \"startTime\": \"09:00\",\n    \"endTime\": \"10:00\",\n    \"status\": \"CONFIRMED\",\n    \"notes\": \"Follow-up consult regarding initial scan results.\",\n    \"price\": 150,\n    \"createdAt\": \"2026-09-27T08:00:00.000Z\",\n    \"updatedAt\": \"2026-09-27T08:00:00.000Z\"\n  }\n}"
+        },
+        {
+          "name": "409 Conflict (Double-Booking Error)",
+          "status": "Conflict",
+          "code": 409,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"success\": false,\n  \"error\": {\n    \"code\": \"BOOKING_CONFLICT\",\n    \"message\": \"This time slot is already booked.\"\n  }\n}"
+        },
+        {
+          "name": "400 Validation Error",
+          "status": "Bad Request",
+          "code": 400,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"success\": false,\n  \"error\": {\n    \"code\": \"VALIDATION_ERROR\",\n    \"message\": \"Invalid booking data\",\n    \"details\": [\n      {\n        \"field\": \"endTime\",\n        \"message\": \"End time must be after start time\"\n      }\n    ]\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get Bookings (List & Filter)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-tenant-slug",
+            "value": "{{tenantSlug}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings?status=CONFIRMED&page=1&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "bookings"],
+          "query": [
+            { "key": "status", "value": "CONFIRMED" },
+            { "key": "date", "value": "2026-10-15", "disabled": true },
+            { "key": "search", "value": "Eleanor", "disabled": true },
+            { "key": "page", "value": "1" },
+            { "key": "limit", "value": "20" }
+          ]
+        },
+        "description": "Returns a paginated list of bookings for the active tenant workspace."
+      },
+      "response": [
+        {
+          "name": "200 Success",
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"cm1q2w3e4r5t6y7u8\",\n      \"customerName\": \"Eleanor Vance\",\n      \"customerEmail\": \"eleanor.vance@example.com\",\n      \"serviceName\": \"Initial Health Consultation\",\n      \"bookingDate\": \"2026-10-15T00:00:00.000Z\",\n      \"startTime\": \"09:00\",\n      \"endTime\": \"10:00\",\n      \"status\": \"CONFIRMED\",\n      \"price\": 150\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 20,\n    \"totalPages\": 1\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get Booking by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-tenant-slug",
+            "value": "{{tenantSlug}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings/:id",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "bookings", ":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "cm1q2w3e4r5t6y7u8"
+            }
+          ]
+        },
+        "description": "Retrieves booking details with scoped tenant isolation."
+      },
+      "response": [
+        {
+          "name": "200 Success",
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"cm1q2w3e4r5t6y7u8\",\n    \"customerName\": \"Eleanor Vance\",\n    \"customerEmail\": \"eleanor.vance@example.com\",\n    \"serviceName\": \"Initial Health Consultation\",\n    \"bookingDate\": \"2026-10-15T00:00:00.000Z\",\n    \"startTime\": \"09:00\",\n    \"endTime\": \"10:00\",\n    \"status\": \"CONFIRMED\",\n    \"notes\": \"Follow-up consult regarding initial scan results.\",\n    \"price\": 150\n  }\n}"
+        },
+        {
+          "name": "404 Not Found",
+          "status": "Not Found",
+          "code": 404,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"success\": false,\n  \"error\": {\n    \"code\": \"NOT_FOUND\",\n    \"message\": \"Booking not found or does not belong to this workspace\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "Update Booking (PATCH)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-tenant-slug",
+            "value": "{{tenantSlug}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"COMPLETED\",\n  \"notes\": \"Consultation conducted successfully. Baseline lab work ordered.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings/:id",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "bookings", ":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "cm1q2w3e4r5t6y7u8"
+            }
+          ]
+        },
+        "description": "Updates an existing booking. Re-evaluates conflict detection if dates or times are modified."
+      },
+      "response": [
+        {
+          "name": "200 Success",
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"cm1q2w3e4r5t6y7u8\",\n    \"status\": \"COMPLETED\",\n    \"notes\": \"Consultation conducted successfully. Baseline lab work ordered.\",\n    \"updatedAt\": \"2026-09-27T08:15:00.000Z\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "Delete Booking",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "x-tenant-slug",
+            "value": "{{tenantSlug}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings/:id",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "bookings", ":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "cm1q2w3e4r5t6y7u8"
+            }
+          ]
+        },
+        "description": "Permanently removes a booking from the database."
+      },
+      "response": [
+        {
+          "name": "200 Success",
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"cm1q2w3e4r5t6y7u8\",\n    \"message\": \"Booking deleted successfully\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get Dashboard Metrics (Stats)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-tenant-slug",
+            "value": "{{tenantSlug}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "stats"]
+        },
+        "description": "Returns calculated database metrics (total, today, upcoming, cancelled, revenue)."
+      },
+      "response": [
+        {
+          "name": "200 Success",
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"totalBookings\": 12,\n    \"todayBookings\": 4,\n    \"upcomingBookings\": 9,\n    \"cancelledBookings\": 1,\n    \"completedBookings\": 2,\n    \"totalCustomers\": 5,\n    \"totalRevenue\": 1250,\n    \"currency\": \"USD\"\n  }\n}"
+        }
+      ]
+    }
+  ]
+}
