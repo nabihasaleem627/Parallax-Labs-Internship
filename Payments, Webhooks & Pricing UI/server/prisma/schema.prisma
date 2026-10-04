@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  BUSINESS
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+
+enum PaymentStatus {
+  NONE
+  PAID
+  OPEN
+  FAILED
+  PENDING
+}
+
+enum WebhookProcessingStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
+
+model User {
+  id           String       @id @default(cuid())
+  name         String
+  email        String       @unique
+  passwordHash String
+  memberships  Membership[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Tenant {
+  id               String         @id @default(cuid())
+  name             String
+  slug             String         @unique
+  timezone         String         @default("UTC")
+  stripeCustomerId String?        @unique
+  memberships      Membership[]
+  customers        Customer[]
+  bookings         Booking[]
+  subscription     Subscription?
+  invoices         Invoice[]
+  webhookEvents    WebhookEvent[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  role      Role     @default(MEMBER)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+model Customer {
+  id        String    @id @default(cuid())
+  tenantId  String
+  name      String
+  email     String
+  phone     String?
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings  Booking[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+model Booking {
+  id         String        @id @default(cuid())
+  tenantId   String
+  customerId String
+  service    String
+  startsAt   DateTime
+  endsAt     DateTime
+  amount     Int           @default(0)
+  currency   String        @default("usd")
+  status     BookingStatus @default(PENDING)
+  notes      String?
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([tenantId, startsAt])
+  @@index([customerId])
+}
+
+model Subscription {
+  id                   String           @id @default(cuid())
+  tenantId             String           @unique
+  stripeCustomerId     String?          @unique
+  stripeSubscriptionId String?          @unique
+  stripePriceId        String?
+  plan                 Plan             @default(FREE)
+  status               String           @default("none")
+  billingInterval      BillingInterval?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  subscriptionStart    DateTime?
+  cancelAtPeriodEnd    Boolean          @default(false)
+  paymentStatus        PaymentStatus    @default(NONE)
+  tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([stripePriceId])
+}
+
+model Invoice {
+  id                   String        @id @default(cuid())
+  tenantId             String
+  stripeInvoiceId      String        @unique
+  stripeSubscriptionId String?
+  number               String
+  amountPaid           Int
+  currency             String        @default("usd")
+  status               String
+  plan                 Plan
+  hostedInvoiceUrl     String?
+  invoicePdf           String?
+  invoiceDate          DateTime
+  tenant               Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([tenantId, invoiceDate])
+}
+
+model WebhookEvent {
+  id          String                  @id @default(cuid())
+  tenantId    String?
+  stripeEventId String                @unique
+  eventType   String
+  status      WebhookProcessingStatus @default(RECEIVED)
+  errorMessage String?
+  processedAt DateTime?
+  tenant      Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([status, createdAt])
+}

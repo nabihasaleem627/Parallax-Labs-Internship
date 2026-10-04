@@ -1,0 +1,12 @@
+node_modules
+.env
+.env.local
+*.log
+client/dist
+server/dist
+coverage
+.DS_Store
+
+*.tsbuildinfo
+client/vite.config.js
+client/vite.config.d.ts
