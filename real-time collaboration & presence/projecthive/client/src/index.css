@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.slate.300') transparent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-card;
+  }
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900;
+  }
+  .label {
+    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+}
+
+/* Collaborative editor document surface */
+.doc-content {
+  @apply text-[15px] leading-7 text-slate-800 outline-none;
+}
+.doc-content h1 {
+  @apply mb-3 mt-6 text-2xl font-bold tracking-tight text-navy-900 first:mt-0;
+}
+.doc-content h2 {
+  @apply mb-2 mt-5 text-lg font-bold text-navy-800 first:mt-0;
+}
+.doc-content h3 {
+  @apply mb-2 mt-4 text-base font-semibold text-navy-800 first:mt-0;
+}
+.doc-content p {
+  @apply mb-3;
+}
+.doc-content ul:not(.checklist) {
+  @apply mb-3 list-disc space-y-1 pl-6;
+}
+.doc-content ol {
+  @apply mb-3 list-decimal space-y-1 pl-6;
+}
+.doc-content a {
+  @apply font-medium text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-700;
+}
+.doc-content blockquote {
+  @apply mb-3 border-l-4 border-indigo-200 pl-4 italic text-slate-600;
+}
+.doc-content ul.checklist {
+  @apply mb-3 space-y-1.5 pl-1;
+}
+.doc-content ul.checklist li {
+  @apply flex items-start gap-2.5 list-none;
+}
+.doc-content ul.checklist li::before {
+  content: '';
+  @apply mt-1 inline-block h-4 w-4 flex-shrink-0 cursor-pointer rounded border-2 border-slate-300 bg-white transition;
+}
+.doc-content ul.checklist li[data-checked='true']::before {
+  @apply border-indigo-600 bg-indigo-600;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3E%3Cpath d='M12.2 4.6a.8.8 0 0 1 1.1 1.1l-5.5 5.6a.8.8 0 0 1-1.1 0l-2.9-2.9a.8.8 0 1 1 1.1-1.1l2.3 2.3 5-5z'/%3E%3C/svg%3E");
+  background-size: contain;
+}
+.doc-content ul.checklist li[data-checked='true'] {
+  @apply text-slate-400 line-through;
+}
+.doc-content:empty::before {
+  content: 'Start writing…';
+  @apply text-slate-400;
+}
