@@ -1,0 +1,1 @@
+ALTER TABLE "tenant_settings" ADD COLUMN "notification_preferences" jsonb;
